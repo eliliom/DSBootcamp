@@ -1,0 +1,241 @@
+---
+title: 'DS Bootcamp in R Module 2 assignment'
+date: '08-Apr-2020'
+author:
+- affiliation: data scientist in Infostud
+  name: Elizaveta Liliom
+output: 
+  html_document:
+    theme: "flatly"
+    toc: true
+    toc_float: true
+    code_download: true
+    df_print: kable
+params:
+  data: "athlete_events.csv"
+---  
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+library(here) # for file paths
+library(tidyverse) # for all else
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(leaflet)
+library(sf)
+theme_set(theme_minimal())
+```
+
+
+```{r include=FALSE}
+olympic <- read.csv(here(params$data), fileEncoding = "UTF-8")
+```
+## Task 1
+
+**Examine the structure of the data**
+
+Let us have a look at data using `glimpse()` function.
+```{r}
+glimpse(olympic)
+```
+
+## Task 2
+
+**Select variables that end with letter t and start with letter S** 
+
+1) End with letter t
+
+2) Start with letter s
+
+3) Start with letter s and end with letter t
+
+##### 1.
+```{r}
+olympic %>% 
+select(ends_with("t")) %>%
+head(5)
+```
+
+##### 2.
+```{r}
+olympic %>% 
+select(starts_with("s")) %>%
+head(5)
+```
+
+##### 3.
+```{r}
+olympic %>% 
+select(starts_with("s") & ends_with("t")) %>%
+head(5)
+```
+
+## Task 3
+
+**Create Body Mass Index variable **
+
+```{r}
+olympic %>% 
+mutate(BMI=Weight/(Height/100)^2) %>%
+select(Name,Team,BMI) %>%
+head(5)
+```
+
+## Task 4
+
+**Filter from data:**
+
+1) Only Serbian teams and save it as OlympicSR
+
+2) Only Serbian teams from 2000 onward and save it as OlympicSR21c
+
+3) Athletes whose weight is bigger than 100kg and height is over 2m
+
+##### 1.
+```{r}
+olympicSR <- olympic %>% 
+filter(Team == "Serbia")
+olympicSR %>% 
+head(5) %>%
+select(Name,Team,Games)
+```
+
+##### 2.
+```{r}
+olympicSR21c <- olympic %>% 
+filter(Team == "Serbia" & Year >= 2000)
+olympicSR21c %>% 
+head(5) %>%
+select(Name,Team,Games)
+```
+
+##### 3.
+```{r}
+olympic %>% 
+filter(Weight > 100 & Height > 200) %>%
+select (Name,Height,Weight) %>%
+head(5)
+```
+
+## Task 5
+
+**Arrange Serbian athletes in olympicSR21c data frame by Height in:**
+
+1) ascending order
+
+2) descending order
+
+##### 1.
+```{r}
+olympicSR21c %>%
+arrange(Height) %>%
+select(Name,Games,Height) %>%
+head(5)
+```
+
+##### 2.
+```{r}
+olympicSR21c %>%
+arrange(desc(Height)) %>%
+select(Name,Games,Height) %>%
+head(5) 
+```
+
+## Task 6
+
+**Using olympicSR df find:**
+
+1) the youngest athlete
+
+2) the heaviest athlete
+
+##### 1.
+```{r}
+olympicSR %>%
+arrange(Age) %>%
+select(Name,Games,Age) %>%
+head(1)
+```
+
+
+##### 2.
+```{r}
+olympicSR %>%
+arrange(desc(Weight)) %>%
+select(Name,Games,Weight) %>%
+head(1)
+```
+
+## Task 7
+
+**Use summarise():**
+
+1) to print out a summary of olympicSR df containing two variables: max_Age and max_BMI
+
+2) to print out a summary of olympicSR df containing two variables: mean_Age and mean_BMI
+
+##### 1.
+```{r}
+olympicSR %>%
+mutate(BMI=Weight/(Height/100)^2) %>%
+summarise(max_Age = max(Age), max_BMI = max(BMI))
+```
+
+##### 2.
+```{r}
+olympicSR %>%
+mutate(BMI=Weight/(Height/100)^2) %>%
+summarise(mean_Age = mean(Age), mean_BMI = mean(BMI))
+```
+
+## Task 8
+
+**Find the number of medals per each team.**
+
+1) Show the results in datatable
+
+2) Visualize your finding
+
+##### 1.
+
+*NOC was chosen instead of Team due to strange "duplications" like Austria, Austria-1 etc.*
+```{r}
+olympic %>% 
+  filter(!is.na(Medal)) %>% 
+  group_by(NOC,Medal) %>% 
+  summarize(cases=n()) %>% 
+  DT::datatable()
+```
+
+##### 2.
+
+Due to the number of data (countries, medals, games) it was decided to visualize the total number of medals per country on the world map (like population). The data set was restricted to Year>2007 due to changes in borders of some countries in the 1990-2000th.
+
+*Note: some countries have different name coding in the olympic table and in the shapefile I got (Algeria: ALG vs DZA). This could be the further improvement for this visualization.*
+```{r message=FALSE, warning=FALSE}
+world <- "ne_50m_admin_0_countries.shp"
+
+world_countries <- st_read(world)
+
+olympic_medals <- olympic %>%
+  filter(Year > 2007) %>%
+  filter(!is.na(Medal)) %>%
+  group_by(NOC) %>%
+  summarise(cases=n())
+
+total_medals <- olympic_medals %>%
+  summarize(sum(cases))
+
+countries_medals <- left_join(world_countries, olympic_medals,by=c("ADM0_A3"="NOC" ))
+
+ggplot(countries_medals) +
+geom_sf(aes(fill=cases)) +
+  scale_fill_distiller(direction = 1, name = "Medals")
+  
+```
+
